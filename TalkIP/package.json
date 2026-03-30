@@ -1,5 +1,5 @@
 {
-  "name": "iptalk",
+  "name": "TalkIP",
   "version": "1.0.0",
   "description": "IP-based real-time chat app",
   "main": "server.js",
