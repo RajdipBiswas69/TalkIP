@@ -13,6 +13,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // rooms: { roomCode: { socketId: { username, socketId } } }
 const rooms = {};
+const messageState = {};
 
 io.on('connection', (socket) => {
   let currentRoom = null;
@@ -32,13 +33,38 @@ io.on('connection', (socket) => {
     io.to(room).emit('system', `${username} joined the room`);
   });
 
-  socket.on('message', ({ text }) => {
+  socket.on('message', ({ text, type = 'text', imageUrl, timestamp, id }) => {
     if (!currentRoom) return;
+
+    const messageId = id || `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    messageState[messageId] = {
+      room: currentRoom,
+      senderId: socket.id,
+      readBy: new Set()
+    };
+
     io.to(currentRoom).emit('message', {
+      id: messageId,
       username: currentUsername,
       text,
-      timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+      type,
+      imageUrl,
+      timestamp: timestamp || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
     });
+  });
+
+  socket.on('message-read', ({ messageId, room }) => {
+    if (!messageId || !currentRoom) return;
+    const state = messageState[messageId];
+    if (!state || state.room !== room || state.senderId === socket.id) return;
+
+    state.readBy.add(socket.id);
+    if (state.senderId) {
+      io.to(state.senderId).emit('message-read', {
+        messageId,
+        username: currentUsername
+      });
+    }
   });
   socket.on('typing', () => {
     if (!currentRoom) return;

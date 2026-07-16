@@ -26,10 +26,17 @@
 
     html, body {
       height: 100%;
+      min-height: 100%;
       background: var(--bg);
       color: var(--text);
       font-family: 'Syne', sans-serif;
       overflow: hidden;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      min-height: 100dvh;
     }
 
     /* ── GRID BACKGROUND ── */
@@ -163,12 +170,14 @@
       position: fixed;
       inset: 0;
       z-index: 10;
+      height: 100dvh;
     }
 
     .chat-layout {
       display: grid;
       grid-template-columns: 220px 1fr;
-      height: 100vh;
+      height: 100%;
+      min-height: 100dvh;
     }
 
     /* SIDEBAR */
@@ -277,6 +286,7 @@
       display: flex;
       flex-direction: column;
       background: var(--bg);
+      min-height: 0;
     }
 
     .chat-header {
@@ -314,12 +324,14 @@
 
     .messages {
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
-      padding: 24px 28px;
+      padding: 24px 28px 96px;
       display: flex;
       flex-direction: column;
       gap: 4px;
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
 
     .messages::-webkit-scrollbar { width: 4px; }
@@ -368,17 +380,38 @@
       margin-bottom: 4px;
       font-family: 'Space Mono', monospace;
     }
+
+    .msg-status {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.4px;
+    }
+    .msg-status.seen {
+      color: var(--accent);
+    }
     .msg-row.self .msg-meta { text-align: right; }
     .msg-meta .username { color: var(--accent); margin-left: 6px; }
     .msg-row.other .msg-meta .username { color: var(--text); margin-right: 6px; margin-left: 0; }
 
     .bubble {
-      max-width: 520px;
+      max-width: min(520px, 82vw);
       padding: 10px 16px;
       border-radius: 12px;
       font-size: 14px;
       line-height: 1.5;
       word-break: break-word;
+      overflow: hidden;
+    }
+
+    .bubble img {
+      display: block;
+      max-width: 100%;
+      max-height: 260px;
+      border-radius: 8px;
+      object-fit: cover;
+      margin-top: 4px;
     }
     .msg-row.self .bubble {
       background: var(--msg-self);
@@ -394,29 +427,61 @@
 
     /* INPUT */
     .chat-input-area {
-      padding: 16px 28px;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom)) 16px;
       border-top: 1px solid var(--border);
       display: flex;
-      align-items: center;
-      gap: 12px;
+      align-items: flex-end;
+      gap: 10px;
       background: var(--card);
+      position: sticky;
+      bottom: 0;
+    }
+
+    .composer {
+      flex: 1;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      min-width: 0;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 8px 10px;
     }
 
     #msg-input {
       flex: 1;
-      background: var(--input-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px 18px;
+      background: transparent;
+      border: none;
       color: var(--text);
       font-family: 'Syne', sans-serif;
       font-size: 14px;
+      line-height: 1.4;
       outline: none;
-      transition: border-color 0.2s;
       resize: none;
+      min-height: 24px;
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 4px 0;
     }
     #msg-input::placeholder { color: var(--muted); }
-    #msg-input:focus { border-color: var(--accent); }
+    #msg-input:focus { border-color: transparent; }
+
+    .upload-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--input-bg);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .upload-btn:hover { border-color: var(--accent); }
+    .upload-btn svg { width: 20px; height: 20px; fill: currentColor; }
 
     .send-btn {
       width: 48px;
@@ -449,6 +514,12 @@
     @media (max-width: 640px) {
       .chat-layout { grid-template-columns: 1fr; }
       .sidebar { display: none; }
+      .chat-header { padding: 16px; }
+      .messages { padding: 16px 16px 96px; }
+      .chat-input-area { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) 12px; }
+      .composer { padding: 8px; }
+      .username-display { display: none; }
+      .bubble { max-width: min(88vw, 420px); }
     }
     #credit {
   position: fixed;
@@ -525,10 +596,16 @@
       </div>
 
       <div class="chat-input-area">
-        <input type="text" id="msg-input" placeholder="Type a message..." autocomplete="off"/>
-        <button class="send-btn" id="send-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
+        <label class="upload-btn" for="image-upload" title="Upload image">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-4.86 8.86L12 10l-2.14 3.86L7 12l-2 4h12l-4.86-8.14z"/></svg>
+        </label>
+        <input type="file" id="image-upload" accept="image/*" hidden />
+        <div class="composer">
+          <textarea id="msg-input" placeholder="Type a message..." rows="1" autocomplete="off"></textarea>
+          <button class="send-btn" id="send-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -539,6 +616,7 @@
   const socket = io();
   let myUsername = '';
   let myRoom = '';
+  const messageStatusEls = new Map();
 
   const loginScreen  = document.getElementById('login-screen');
   const chatScreen   = document.getElementById('chat-screen');
@@ -549,6 +627,7 @@
   const messagesDiv  = document.getElementById('messages');
   const msgInput     = document.getElementById('msg-input');
   const sendBtn      = document.getElementById('send-btn');
+  const imageUpload  = document.getElementById('image-upload');
   const leaveBtn     = document.getElementById('leave-btn');
   const clearBtn     = document.getElementById('clear-btn');
 
@@ -595,6 +674,26 @@
     el.focus();
   }
 
+  function getTimestamp() {
+    return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  function makeMessageId() {
+    return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  }
+
+  function updateMessageStatus(messageId, status) {
+    const el = messageStatusEls.get(messageId);
+    if (!el) return;
+    el.textContent = status;
+    el.classList.toggle('seen', status === 'Seen');
+  }
+
+  function autoResizeTextarea() {
+    msgInput.style.height = 'auto';
+    msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+  }
+
   socket.on('system', (text) => {
     const d = document.createElement('div');
     d.className = 'system-msg';
@@ -603,7 +702,7 @@
     scrollBottom();
   });
 
-  socket.on('message', ({ username, text, timestamp }) => {
+  socket.on('message', ({ id, username, text, timestamp, type = 'text', imageUrl }) => {
     const isSelf = username === myUsername;
     const row = document.createElement('div');
     row.className = `msg-row ${isSelf ? 'self' : 'other'}`;
@@ -618,12 +717,38 @@
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    bubble.textContent = text;
+
+    if (type === 'image' && imageUrl) {
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.alt = 'Shared image';
+      bubble.appendChild(img);
+    } else {
+      bubble.textContent = text || '';
+    }
 
     row.appendChild(meta);
     row.appendChild(bubble);
+
+    if (isSelf && id) {
+      const statusEl = document.createElement('div');
+      statusEl.className = 'msg-status';
+      statusEl.textContent = 'Sent';
+      row.appendChild(statusEl);
+      messageStatusEls.set(id, statusEl);
+    } else if (!isSelf && id) {
+      setTimeout(() => {
+        socket.emit('message-read', { messageId: id, room: myRoom });
+      }, 250);
+    }
+
     messagesDiv.appendChild(row);
     scrollBottom();
+  });
+
+  socket.on('message-read', ({ messageId, username }) => {
+    if (!messageId) return;
+    updateMessageStatus(messageId, username ? 'Seen' : 'Seen');
   });
 
   socket.on('members', (members) => {
@@ -643,6 +768,7 @@
   });
 
   sendBtn.addEventListener('click', sendMessage);
+  msgInput.addEventListener('input', autoResizeTextarea);
   msgInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -650,11 +776,34 @@
     }
   });
 
+  imageUpload.addEventListener('change', (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      socket.emit('message', {
+        id: makeMessageId(),
+        type: 'image',
+        imageUrl: reader.result,
+        timestamp: getTimestamp()
+      });
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  });
+
   function sendMessage() {
     const text = msgInput.value.trim();
     if (!text) return;
-    socket.emit('message', { text });
+    socket.emit('message', {
+      id: makeMessageId(),
+      text,
+      type: 'text',
+      timestamp: getTimestamp()
+    });
     msgInput.value = '';
+    autoResizeTextarea();
     msgInput.focus();
   }
 
