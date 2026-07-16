@@ -6,7 +6,8 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: { origin: '*' },
+  maxHttpBufferSize: 20 * 1024 * 1024
 });
 
 app.use(express.static(path.join(__dirname, 'public')));

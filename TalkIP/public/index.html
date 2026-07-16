@@ -187,7 +187,17 @@
       display: flex;
       flex-direction: column;
       padding: 0;
+      transition: transform 0.2s ease;
     }
+
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 20;
+      display: none;
+    }
+    .sidebar-overlay.show { display: block; }
 
     .sidebar-logo {
       padding: 24px 20px 20px;
@@ -296,7 +306,42 @@
       align-items: center;
       justify-content: space-between;
       background: var(--card);
+      gap: 12px;
     }
+
+    .menu-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .menu-btn span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+      position: relative;
+    }
+    .menu-btn span::before,
+    .menu-btn span::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      width: 18px;
+      height: 2px;
+      border-radius: 2px;
+      background: currentColor;
+    }
+    .menu-btn span::before { top: -5px; }
+    .menu-btn span::after { top: 5px; }
 
     .room-title {
       font-family: 'Space Mono', monospace;
@@ -513,7 +558,18 @@
     /* Responsive */
     @media (max-width: 640px) {
       .chat-layout { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(82vw, 300px);
+        z-index: 30;
+        transform: translateX(-100%);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .menu-btn { display: inline-flex; }
       .chat-header { padding: 16px; }
       .messages { padding: 16px 16px 96px; }
       .chat-input-area { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) 12px; }
@@ -561,8 +617,10 @@
 <div id="chat-screen">
   <div class="chat-layout">
 
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
     <!-- SIDEBAR -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
       <div class="sidebar-logo">
         <div class="logo">[<span>IP</span> <span class="accent">TALK</span>]</div>
       </div>
@@ -584,6 +642,9 @@
     <!-- CHAT AREA -->
     <div class="chat-area">
       <div class="chat-header">
+        <button class="menu-btn" id="menu-btn" aria-label="Open members menu">
+          <span></span>
+        </button>
         <div class="room-title">ROOM // <span id="room-title-display">—</span></div>
         <div style="display:flex;align-items:center;gap:12px;">
           <button class="clear-btn" id="clear-btn">🗑 Clear</button>
@@ -617,6 +678,7 @@
   let myUsername = '';
   let myRoom = '';
   const messageStatusEls = new Map();
+  const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
   const loginScreen  = document.getElementById('login-screen');
   const chatScreen   = document.getElementById('chat-screen');
@@ -630,6 +692,9 @@
   const imageUpload  = document.getElementById('image-upload');
   const leaveBtn     = document.getElementById('leave-btn');
   const clearBtn     = document.getElementById('clear-btn');
+  const menuBtn      = document.getElementById('menu-btn');
+  const sidebar      = document.getElementById('sidebar');
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
 
   socket.on('connect', () => {
     statusMsg.textContent = 'Connected to server ✓';
@@ -645,6 +710,30 @@
   connectBtn.addEventListener('click', joinRoom);
   usernameInput.addEventListener('keydown', e => e.key === 'Enter' && joinRoom());
   roomInput.addEventListener('keydown', e => e.key === 'Enter' && joinRoom());
+
+  function openSidebar() {
+    if (window.innerWidth <= 640) {
+      sidebar.classList.add('open');
+      sidebarOverlay.classList.add('show');
+    }
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    sidebarOverlay.classList.remove('show');
+  }
+
+  menuBtn.addEventListener('click', () => {
+    if (sidebar.classList.contains('open')) closeSidebar();
+    else openSidebar();
+  });
+  sidebarOverlay.addEventListener('click', closeSidebar);
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 640) {
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('show');
+    }
+  });
 
   function joinRoom() {
     const username = usernameInput.value.trim();
@@ -780,6 +869,19 @@
     const file = event.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
 
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      statusMsg.textContent = 'Image is too large. Please choose a smaller file.';
+      statusMsg.classList.add('error');
+      setTimeout(() => {
+        if (statusMsg.textContent === 'Image is too large. Please choose a smaller file.') {
+          statusMsg.textContent = 'Connected to server ✓';
+          statusMsg.classList.remove('error');
+        }
+      }, 2500);
+      event.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       socket.emit('message', {
@@ -788,6 +890,10 @@
         imageUrl: reader.result,
         timestamp: getTimestamp()
       });
+    };
+    reader.onerror = () => {
+      statusMsg.textContent = 'Unable to read image. Please try another file.';
+      statusMsg.classList.add('error');
     };
     reader.readAsDataURL(file);
     event.target.value = '';
@@ -816,6 +922,7 @@
     chatScreen.style.display = 'none';
     loginScreen.style.display = 'flex';
     messagesDiv.innerHTML = '<div class="start-msg">— Start of conversation —</div>';
+    closeSidebar();
   });
 
   function scrollBottom() {
